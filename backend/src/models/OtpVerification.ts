@@ -1,0 +1,27 @@
+import mongoose, { Document, Schema } from 'mongoose';
+
+export interface IOtpVerification extends Document {
+  email: string;
+  purpose: 'SIGNUP' | 'PASSWORD_RESET';
+  otpHash: string;
+  expiresAt: Date;
+  attempts: number;
+  consumedAt?: Date;
+  createdAt: Date;
+}
+
+const otpVerificationSchema = new Schema<IOtpVerification>(
+  {
+    email: { type: String, required: true, lowercase: true, trim: true },
+    purpose: { type: String, enum: ['SIGNUP', 'PASSWORD_RESET'], required: true },
+    otpHash: { type: String, required: true },
+    expiresAt: { type: Date, required: true },
+    attempts: { type: Number, default: 0 },
+    consumedAt: { type: Date },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
+otpVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const OtpVerification = mongoose.model<IOtpVerification>('OtpVerification', otpVerificationSchema);

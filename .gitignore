@@ -1,0 +1,51 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.env
+*.env.*
+!*.env.example
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+*/dist/
+build/
+*/build/
+.gradle/
+*/.gradle/
+.expo/
+*/.expo/
+
+# Signing keys & keystores
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+
+# Android local & temporary configs
+local.properties
+*/local.properties
+.cxx/
+*/.cxx/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+powershell.cmd
+
+# Uploads
+uploads/
+backend/uploads/

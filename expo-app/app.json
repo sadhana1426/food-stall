@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Tasty Bites",
+    "slug": "tasty-bites",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.tastybites.billing",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#064E3B"
+        }
+      ],
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-sharing",
+      "@react-native-community/datetimepicker"
+    ],
+    "scheme": "tastybites"
+  }
+}

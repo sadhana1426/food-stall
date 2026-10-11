@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+dist/
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+local.properties
+.cxx/
