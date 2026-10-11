@@ -1,7 +1,7 @@
 import { cloudinary } from '../config/cloudinary';
 import { config } from '../config/env';
 import { ApiError } from '../utils/ApiError';
-import fs from 'fs';
+import fs from 'node:fs';
 
 export class CloudinaryService {
   static async uploadMenuImage(filePath: string, businessId: string) {

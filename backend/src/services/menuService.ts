@@ -1,7 +1,8 @@
 import { MenuItem, IMenuItem } from '../models/MenuItem';
 import { ApiError } from '../utils/ApiError';
 import { CloudinaryService } from './cloudinaryService';
-import fs from 'fs';
+import fs from 'node:fs';
+import type {} from 'multer';
 
 export class MenuService {
   static async getMenuItems(businessId: string, query: any) {

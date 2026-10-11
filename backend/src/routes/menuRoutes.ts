@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate';
 import { createMenuSchema, updateMenuSchema } from '../validation/menuSchemas';
 import { requireAuth } from '../middleware/authMiddleware';
 import multer from 'multer';
-import fs from 'fs';
+import fs from 'node:fs';
 
 // Ensure uploads directory exists
 if (!fs.existsSync('uploads')) {

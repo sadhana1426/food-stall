@@ -1,4 +1,5 @@
 import { Business } from '../models/Business';
+import { User } from '../models/User';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env';
@@ -25,7 +26,6 @@ export class SettingsService {
   }
 
   static async verifyAdminPassword(userId: string, businessId: string, password: string) {
-    const { User } = require('../models/User');
     const user = await User.findById(userId);
     
     if (!user) {

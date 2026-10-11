@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/authMiddleware';
 import { uploadImage } from '../controllers/uploadController';
-import fs from 'fs';
+import fs from 'node:fs';
 
 // Ensure uploads directory exists
 if (!fs.existsSync('uploads')) {

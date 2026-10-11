@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { v2 as cloudinary } from 'cloudinary';
 import { config } from '../config/env';
-import fs from 'fs';
+import fs from 'node:fs';
 
 // CLOUDINARY_URL is automatically picked up by cloudinary from process.env
 

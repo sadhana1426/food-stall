@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { Buffer } from 'node:buffer';
 import { Order, IOrder } from '../models/Order';
 import { Business, IBusiness } from '../models/Business';
 import { ApiError } from '../utils/ApiError';

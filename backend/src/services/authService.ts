@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { Business } from '../models/Business';

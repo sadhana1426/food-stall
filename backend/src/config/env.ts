@@ -23,12 +23,15 @@ const envSchema = z.object({
   CLOUDINARY_URL: z.string().optional(), // kept for fallback
 });
 
-const _env = envSchema.safeParse(process.env);
+export type EnvConfig = z.infer<typeof envSchema>;
 
-if (!_env.success) {
-  console.error("❌ Invalid environment variables:");
-  console.error(_env.error.format());
-  process.exit(1);
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  const issues = parsed.error.issues
+    .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+    .join(', ');
+  throw new Error(`Invalid environment configuration: ${issues}`);
 }
 
-export const config = _env.data;
+export const config: EnvConfig = parsed.data;
