@@ -1,48 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, spacing, typography, radius } from '../../src/theme';
+import { colors, spacing, typography, radius, shadows } from '../../src/theme';
 import { useSettingsStore } from '../../src/store/useSettingsStore';
 import { usePrinterStore } from '../../src/store/usePrinterStore';
-import { useOrdersStore } from '../../src/store/useOrdersStore';
-import { useMenuStore } from '../../src/store/useMenuStore';
-import { useCartStore } from '../../src/store/useCartStore';
-import { useAppStore } from '../../src/store/useAppStore';
-import { SegmentedControl } from '../../src/components/common/SegmentedControl';
-import { ToggleRow } from '../../src/components/common/ToggleRow';
-import { PrimaryButton } from '../../src/components/common/PrimaryButton';
-import { SecondaryButton } from '../../src/components/common/SecondaryButton';
 
 export default function AppSettingsScreen() {
   const router = useRouter();
   
-  const { defaultOrderType, setDefaultOrderType, resetSettings } = useSettingsStore();
-  const { autoPrint, autoReconnect, updateConfig, forget } = usePrinterStore();
-  const { resetOrders } = useOrdersStore();
-  const { resetMenu } = useMenuStore();
-  const { clearCart } = useCartStore();
-  const { resetSetup } = useAppStore();
-
-  const [showResetModal, setShowResetModal] = useState(false);
-
-  const handleResetData = () => {
-    resetSettings();
-    forget();
-    resetOrders();
-    resetMenu();
-    clearCart();
-    
-    setShowResetModal(false);
-    alert('Demo data has been reset to defaults.');
-  };
-
-  const handleRestartSetup = () => {
-    handleResetData();
-    resetSetup();
-    router.replace('/setup');
-  };
+  const { defaultOrderType, setDefaultOrderType } = useSettingsStore();
+  const { autoPrint, autoReconnect, updateConfig } = usePrinterStore();
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -54,93 +23,151 @@ export default function AppSettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
           <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>App Settings</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Section 1: Order & Billing */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>General</Text>
-          <Text style={styles.label}>Default Order Type</Text>
-          <SegmentedControl 
-            options={[{ label: 'Dine In', value: 'Dine In' }, { label: 'Takeaway', value: 'Takeaway' }]} 
-            selectedValue={defaultOrderType} 
-            onSelect={(val) => setDefaultOrderType(val as any)} 
-          />
+          <Text style={styles.sectionTitle}>Order & Billing</Text>
+          
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+                <MaterialIcons name="restaurant" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.itemTitle}>Default Order Type</Text>
+                <Text style={styles.itemSubtitle}>Pre-selected type when starting a new bill</Text>
+              </View>
+            </View>
+
+            <View style={styles.segmentedContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.segmentOption,
+                  defaultOrderType === 'Dine In' && styles.segmentOptionActive,
+                ]}
+                onPress={() => setDefaultOrderType('Dine In')}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons 
+                  name="table-restaurant" 
+                  size={18} 
+                  color={defaultOrderType === 'Dine In' ? colors.white : colors.text.secondary} 
+                />
+                <Text
+                  style={[
+                    styles.segmentText,
+                    defaultOrderType === 'Dine In' && styles.segmentTextActive,
+                  ]}
+                >
+                  Dine In
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.segmentOption,
+                  defaultOrderType === 'Takeaway' && styles.segmentOptionActive,
+                ]}
+                onPress={() => setDefaultOrderType('Takeaway')}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons 
+                  name="takeout-dining" 
+                  size={18} 
+                  color={defaultOrderType === 'Takeaway' ? colors.white : colors.text.secondary} 
+                />
+                <Text
+                  style={[
+                    styles.segmentText,
+                    defaultOrderType === 'Takeaway' && styles.segmentTextActive,
+                  ]}
+                >
+                  Takeaway
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
+        {/* Section 2: Receipt & Printing */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Printer Settings</Text>
-          
-          <ToggleRow 
-            title="Auto-Print Receipts" 
-            subtitle="Print receipt immediately upon bill generation"
-            value={autoPrint}
-            onValueChange={(val) => updateConfig({ autoPrint: val })}
-          />
+          <Text style={styles.sectionTitle}>Receipt & Printing</Text>
 
-          <ToggleRow 
-            title="Auto-Reconnect" 
-            subtitle="Automatically reconnect to paired printer on launch"
-            value={autoReconnect}
-            onValueChange={(val) => updateConfig({ autoReconnect: val })}
-          />
-
-          <View style={styles.dangerZone}>
-            <Text style={styles.dangerTitle}>Danger Zone</Text>
-            
-            <TouchableOpacity style={styles.dangerButton} onPress={() => setShowResetModal(true)}>
-              <MaterialIcons name="delete-forever" size={24} color={colors.error} />
-              <Text style={styles.dangerButtonText}>Reset Demo Data</Text>
-            </TouchableOpacity>
+          <View style={styles.card}>
+            {/* Auto Print Row */}
+            <View style={styles.toggleRow}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.accent + '15' }]}>
+                <MaterialIcons name="print" size={20} color={colors.accent} />
+              </View>
+              <View style={styles.toggleTextContainer}>
+                <Text style={styles.itemTitle}>Auto-Print Receipts</Text>
+                <Text style={styles.itemSubtitle}>Print receipt automatically when a bill is created</Text>
+              </View>
+              <Switch
+                value={autoPrint}
+                onValueChange={(val) => updateConfig({ autoPrint: val })}
+                trackColor={{ false: '#E0E0E0', true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.dangerButton} onPress={handleRestartSetup}>
-              <MaterialIcons name="refresh" size={24} color={colors.accent} />
-              <Text style={[styles.dangerButtonText, { color: colors.accent }]}>Restart First-Time Setup</Text>
-            </TouchableOpacity>
+            {/* Auto Reconnect Row */}
+            <View style={styles.toggleRow}>
+              <View style={[styles.iconContainer, { backgroundColor: '#3B82F615' }]}>
+                <MaterialIcons name="bluetooth-connected" size={20} color="#2563EB" />
+              </View>
+              <View style={styles.toggleTextContainer}>
+                <Text style={styles.itemTitle}>Auto-Reconnect</Text>
+                <Text style={styles.itemSubtitle}>Connect to saved thermal printer on app launch</Text>
+              </View>
+              <Switch
+                value={autoReconnect}
+                onValueChange={(val) => updateConfig({ autoReconnect: val })}
+                trackColor={{ false: '#E0E0E0', true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
           </View>
         </View>
 
-        <View style={styles.footerInfo}>
-          <Text style={styles.versionText}>Tasty Bites POS Prototype</Text>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
+        {/* Section 3: App Information */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App Information</Text>
+
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <Image 
+                source={require('../../assets/images/logo.png')} 
+                style={styles.appLogo} 
+                resizeMode="contain" 
+              />
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.appName}>Tasty Bites POS</Text>
+                <Text style={styles.appVersion}>Version 1.0.0 (Production)</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.statusRow}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>Cloud Backend Connected</Text>
+            </View>
+          </View>
         </View>
+
       </ScrollView>
-
-      {/* Reset Modal */}
-      <Modal visible={showResetModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIcon}>
-              <MaterialIcons name="warning" size={48} color={colors.error} />
-            </View>
-            <Text style={styles.modalTitle}>Reset Demo Data?</Text>
-            <Text style={styles.modalSubtitle}>
-              This will clear all orders, reset the menu to defaults, and clear all settings. This action cannot be undone.
-            </Text>
-            
-            <View style={styles.modalActions}>
-              <View style={{ flex: 1, marginRight: spacing.sm }}>
-                <SecondaryButton label="CANCEL" onPress={() => setShowResetModal(false)} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <TouchableOpacity 
-                  style={[styles.primaryBtnBase, { backgroundColor: colors.error }]} 
-                  onPress={handleResetData}
-                >
-                  <Text style={styles.primaryBtnTextBase}>RESET ALL</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -154,12 +181,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  backButton: { padding: spacing.xs },
+  backButton: {
+    padding: spacing.xs,
+    borderRadius: radius.full,
+  },
   headerTitle: {
     fontSize: typography.size.lg,
     fontWeight: typography.weight.bold,
@@ -167,113 +198,135 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   section: {
     marginBottom: spacing.xl,
   },
   sectionTitle: {
-    fontSize: typography.size.sm,
+    fontSize: typography.size.xs,
     fontWeight: typography.weight.bold,
     color: colors.text.secondary,
     textTransform: 'uppercase',
-    marginBottom: spacing.md,
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
     marginLeft: spacing.xs,
   },
-  label: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.medium,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
-  },
-  dangerZone: {
+  card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.error + '40',
-    marginTop: spacing.md,
+    borderColor: '#EFEFEF',
+    ...shadows.small,
   },
-  dangerTitle: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.bold,
-    color: colors.error,
-    textTransform: 'uppercase',
-    marginBottom: spacing.md,
-  },
-  dangerButton: {
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
   },
-  dangerButtonText: {
+  iconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  itemTitle: {
     fontSize: typography.size.md,
     fontWeight: typography.weight.bold,
-    color: colors.error,
-    marginLeft: spacing.md,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  itemSubtitle: {
+    fontSize: typography.size.xs,
+    color: colors.text.secondary,
+    lineHeight: 16,
+  },
+  segmentedContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    padding: 4,
+    gap: spacing.xs,
+  },
+  segmentOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.sm,
+    gap: spacing.xs,
+  },
+  segmentOptionActive: {
+    backgroundColor: colors.primary,
+    ...shadows.small,
+  },
+  segmentText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semiBold,
+    color: colors.text.secondary,
+  },
+  segmentTextActive: {
+    color: colors.white,
+    fontWeight: typography.weight.bold,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  toggleTextContainer: {
+    flex: 1,
+    paddingRight: spacing.sm,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: '#F3F4F6',
     marginVertical: spacing.md,
   },
-  footerInfo: {
+  infoRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xxl,
-    marginBottom: spacing.xl,
   },
-  versionText: {
-    fontSize: typography.size.sm,
-    color: colors.text.secondary,
-    marginBottom: 4,
+  appLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    marginRight: spacing.md,
   },
-  modalOverlay: {
+  infoTextContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
   },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    width: '100%',
-    alignItems: 'center',
-  },
-  modalIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.error + '1A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  modalTitle: {
-    fontSize: typography.size.lg,
+  appName: {
+    fontSize: typography.size.md,
     fontWeight: typography.weight.bold,
     color: colors.text.primary,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
   },
-  modalSubtitle: {
-    fontSize: typography.size.md,
+  appVersion: {
+    fontSize: typography.size.xs,
     color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginTop: 2,
   },
-  modalActions: {
+  statusRow: {
     flexDirection: 'row',
-    width: '100%',
-  },
-  primaryBtnBase: {
-    paddingVertical: spacing.lg,
-    borderRadius: radius.md,
     alignItems: 'center',
   },
-  primaryBtnTextBase: {
-    color: colors.white,
-    fontWeight: typography.weight.bold,
-    fontSize: typography.size.md,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.success,
+    marginRight: spacing.sm,
+  },
+  statusText: {
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+    color: colors.text.secondary,
   },
 });

@@ -1,11 +1,17 @@
+import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothPrinterService } from './BluetoothPrinterService';
 import { MockPrinterService } from './MockPrinterService';
 import { PrinterService } from './printerTypes';
 
-// Provide a factory or singleton based on environment
-const isDev = process.env.EXPO_PUBLIC_MOCK_PRINTER === 'true';
+const hasBluetoothNativeModule = !!(
+  RNBluetoothClassic &&
+  typeof (RNBluetoothClassic as any).isBluetoothEnabled === 'function'
+);
 
-export const printerService: PrinterService = isDev 
+// In release builds, NEVER fall back to mock printer. Real Bluetooth Classic is strictly used.
+const useMock = __DEV__ && process.env.EXPO_PUBLIC_MOCK_PRINTER === 'true' && !hasBluetoothNativeModule;
+
+export const printerService: PrinterService = useMock 
   ? new MockPrinterService() 
   : new BluetoothPrinterService();
 

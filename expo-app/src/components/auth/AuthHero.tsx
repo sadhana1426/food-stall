@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
+
+const BRAND_LOGO = require('../../../assets/images/logo.png');
 
 export type FoodVisualVariant = 
   | 'login-email'
@@ -42,13 +44,18 @@ export const AuthHero = ({ variant, title, subtitle }: Props) => {
   return (
     <View style={styles.container}>
       <View style={styles.visualContainer}>
-        <Text style={styles.visual}>{getVisual()}</Text>
+        {isLogin ? (
+          <Image source={BRAND_LOGO} style={styles.brandLogo} resizeMode="contain" />
+        ) : (
+          <Text style={styles.visual}>{getVisual()}</Text>
+        )}
       </View>
       <Text style={[styles.title, isLogin && styles.titleDark]}>{title}</Text>
       {subtitle && <Text style={[styles.subtitle, isLogin && styles.subtitleDark]}>{subtitle}</Text>}
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -73,6 +80,11 @@ const styles = StyleSheet.create({
   },
   visual: {
     fontSize: 48,
+  },
+  brandLogo: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
   },
   title: {
     fontSize: 28,

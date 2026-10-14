@@ -1,11 +1,8 @@
 import { useAuthStore } from '../store/useAuthStore';
 import * as SecureStore from 'expo-secure-store';
 
-let BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-
-if (!BASE_URL) {
-  throw new Error('EXPO_PUBLIC_API_BASE_URL is not defined in .env');
-}
+const PRODUCTION_API_URL = 'https://food-stall-152b.onrender.com/api/v1';
+let BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || PRODUCTION_API_URL;
 
 export class ApiError extends Error {
   code: string;
@@ -29,7 +26,7 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-export const apiClient = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
+export const apiClient = async <T = any>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${BASE_URL}${endpoint}`;
   
   const { accessToken } = useAuthStore.getState();
@@ -109,7 +106,7 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}): Pr
   }
 };
 
-const handleResponse = async (response: Response) => {
+const handleResponse = async <T = any>(response: Response): Promise<T> => {
   let json: any = {};
   try {
     json = await response.json();
@@ -120,5 +117,5 @@ const handleResponse = async (response: Response) => {
     throw new ApiError(errorMessage, json?.error?.code);
   }
 
-  return json.data;
+  return json.data as T;
 };

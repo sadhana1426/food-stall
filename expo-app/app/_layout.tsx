@@ -37,7 +37,11 @@ export default function RootLayout() {
         <Stack.Screen name="checkout" />
         <Stack.Screen name="bill-preview" />
         <Stack.Screen name="bill-success" />
+        <Stack.Screen name="bill-details/[id]" />
         <Stack.Screen name="admin/pin" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="admin/menu" />
+        <Stack.Screen name="admin/item" />
+        <Stack.Screen name="settings/printer" />
       </Stack>
     </>
   );

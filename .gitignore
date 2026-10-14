@@ -19,6 +19,16 @@ build/
 */.gradle/
 .expo/
 */.expo/
+*.apk
+*.aab
+
+# Android
+local.properties
+*/local.properties
+.cxx/
+*/.cxx/
+android/app/build/
+*/android/app/build/
 
 # Signing keys & keystores
 *.keystore
@@ -26,12 +36,6 @@ build/
 *.p12
 *.pem
 *.key
-
-# Android local & temporary configs
-local.properties
-*/local.properties
-.cxx/
-*/.cxx/
 
 # Logs
 *.log

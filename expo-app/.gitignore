@@ -4,6 +4,8 @@ dist/
 .env
 .env.*
 !.env.example
+*.apk
+*.aab
 *.keystore
 *.jks
 *.p12
@@ -11,3 +13,5 @@ dist/
 *.key
 local.properties
 .cxx/
+android/app/build/
+*.log

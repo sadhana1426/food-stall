@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, BackHandler, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, radius } from '../src/theme';
 import { useCurrentOrderStore } from '../src/store/useCurrentOrderStore';
 import { useCartStore } from '../src/store/useCartStore';
+import { usePrinterStore } from '../src/store/usePrinterStore';
 import { PrimaryButton } from '../src/components/common/PrimaryButton';
 import { SecondaryButton } from '../src/components/common/SecondaryButton';
 import { formatMoney } from '../src/utils/money';
@@ -15,21 +16,27 @@ export default function BillSuccessScreen() {
   const { orderId, printSuccess } = useLocalSearchParams<{ orderId: string, printSuccess: string }>();
   const { currentOrder, clearCurrentOrder } = useCurrentOrderStore();
   const { clearCart } = useCartStore();
+  const { printOrder } = usePrinterStore();
 
-  const order = (currentOrder?._id === orderId || currentOrder?.id === orderId) ? currentOrder : null;
-  const printFailed = printSuccess === 'false';
+  // Keep snapshot of currentOrder so clearing order doesn't break rendering or navigation
+  const [orderSnapshot] = useState<any>(() => currentOrder);
+  const effectiveOrderId = orderId || currentOrder?._id || currentOrder?.id || orderSnapshot?._id || orderSnapshot?.id;
+  const order = currentOrder || orderSnapshot;
+  const [isRetryingPrint, setIsRetryingPrint] = useState(false);
+  const [printStatus, setPrintStatus] = useState<string>(printSuccess);
+
+  const printFailed = printStatus === 'false';
 
   useEffect(() => {
-    if (!order) {
+    if (!order && !effectiveOrderId) {
       router.replace('/(tabs)/billing');
     }
-  }, [order]);
+  }, []);
 
   useEffect(() => {
     const onBackPress = () => {
       clearCart();
       clearCurrentOrder();
-      router.dismissAll();
       router.replace('/(tabs)/billing');
       return true;
     };
@@ -37,23 +44,41 @@ export default function BillSuccessScreen() {
     return () => subscription.remove();
   }, []);
 
-  if (!order) {
-    return null;
-  }
+  const handleRetryPrint = async () => {
+    if (!order || isRetryingPrint) return;
+    setIsRetryingPrint(true);
+    try {
+      const ok = await printOrder(order);
+      if (ok) {
+        setPrintStatus('true');
+        Alert.alert('Printed', 'Receipt printed successfully.');
+      } else {
+        Alert.alert('Print Failed', 'Printer is still unavailable. Please check printer connection.');
+      }
+    } finally {
+      setIsRetryingPrint(false);
+    }
+  };
+
+  const handleGoToPrinterSetup = () => {
+    router.push('/settings/printer');
+  };
 
   const handleNewOrder = () => {
     clearCart();
     clearCurrentOrder();
-    router.dismissAll();
     router.replace('/(tabs)/billing');
   };
 
   const handleViewBill = () => {
+    const idToView = effectiveOrderId;
     clearCart();
     clearCurrentOrder();
-    router.dismissAll();
-    const orderIdToView = order.id || order._id || '';
-    router.replace({ pathname: '/bill-details/[id]', params: { id: orderIdToView } });
+    if (idToView) {
+      router.replace({ pathname: '/bill-details/[id]', params: { id: idToView } });
+    } else {
+      router.replace('/(tabs)/billing');
+    }
   };
 
   return (
@@ -68,21 +93,47 @@ export default function BillSuccessScreen() {
         </View>
         
         <Text style={styles.title}>
-          {printFailed ? 'Bill Saved, Print Failed' : 'Bill Generated'}
+          {printFailed ? 'Bill Saved Successfully' : 'Bill Generated'}
         </Text>
         
-        <Text style={styles.amount}>₹{formatMoney(order.grandTotalPaise)}</Text>
+        <Text style={styles.amount}>₹{formatMoney(order?.grandTotalPaise || 0)}</Text>
         
         <View style={styles.metaBadge}>
           <Text style={styles.metaText}>
-            {order.billNumber} • {order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}
+            {order?.billNumber} • {order?.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}
           </Text>
         </View>
         
         {printFailed && (
-          <Text style={styles.warningText}>
-            Printer was unavailable or encountered an error. The bill is saved in history.
-          </Text>
+          <View style={styles.failureBox}>
+            <Text style={styles.warningText}>
+              Printer is not connected. The bill was saved in history.
+            </Text>
+            <View style={styles.failureActions}>
+              <TouchableOpacity 
+                style={styles.retryBtn} 
+                onPress={handleRetryPrint}
+                disabled={isRetryingPrint}
+              >
+                {isRetryingPrint ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <>
+                    <MaterialIcons name="refresh" size={16} color={colors.white} />
+                    <Text style={styles.retryBtnText}>Retry Print</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.connectBtn} 
+                onPress={handleGoToPrinterSetup}
+              >
+                <MaterialIcons name="bluetooth" size={16} color={colors.primary} />
+                <Text style={styles.connectBtnText}>Connect Printer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
 
@@ -150,10 +201,49 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontWeight: typography.weight.medium,
   },
-  warningText: {
+  failureBox: {
     marginTop: spacing.xl,
+    alignItems: 'center',
+    width: '100%',
+  },
+  warningText: {
     textAlign: 'center',
     color: colors.accent,
+    fontSize: typography.size.sm,
+    marginBottom: spacing.md,
+  },
+  failureActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    gap: 6,
+  },
+  retryBtnText: {
+    color: colors.white,
+    fontWeight: typography.weight.bold,
+    fontSize: typography.size.sm,
+  },
+  connectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    gap: 6,
+  },
+  connectBtnText: {
+    color: colors.primary,
+    fontWeight: typography.weight.bold,
     fontSize: typography.size.sm,
   },
   footer: {

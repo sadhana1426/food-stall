@@ -1,49 +1,72 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Switch, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, radius, shadows } from '../../src/theme';
 import { SearchBar } from '../../src/components/billing/SearchBar';
 import { EmptyState } from '../../src/components/common/EmptyState';
 import { formatMoney } from '../../src/utils/money';
 import { menuApi } from '../../src/api/menuApi';
-import { useFocusEffect } from 'expo-router';
+import { useMenuStore } from '../../src/store/useMenuStore';
 import { MenuItem } from '../../src/types';
 
 export default function ManageMenuScreen() {
   const router = useRouter();
-  const [items, setItems] = useState<MenuItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { 
+    items, 
+    isLoading, 
+    isRefreshing, 
+    error, 
+    fetchMenu, 
+    refreshMenu, 
+    updateAvailabilityInStore, 
+    removeItem 
+  } = useMenuStore();
   const [searchQuery, setSearchQuery] = useState('');
-
-  const loadMenu = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await menuApi.getMenu();
-      setItems(data);
-    } catch (err: any) {
-      setError(err.message || 'Unable to load menu.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      loadMenu();
-    }, [loadMenu])
+      refreshMenu();
+    }, [refreshMenu])
   );
 
   const toggleAvailability = async (id: string, current: boolean) => {
+    updateAvailabilityInStore(id, !current);
     try {
       await menuApi.updateAvailability(id, !current);
-      // Optimistic update
-      setItems(items.map(i => ((i.id || i._id) === id) ? { ...i, isAvailable: !current } : i));
     } catch (err) {
-      alert('Failed to update availability. Connection required.');
+      updateAvailabilityInStore(id, current);
+      Alert.alert('Error', 'Failed to update availability. Connection required.');
+    }
+  };
+
+  const confirmDeleteItem = (item: MenuItem) => {
+    const itemId = item.id || item._id || '';
+    Alert.alert(
+      `Delete "${item.name}"?`,
+      'This will remove the item from your active menu. Past bills will remain unchanged.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete Item', 
+          style: 'destructive', 
+          onPress: () => handleDeleteItem(itemId) 
+        }
+      ]
+    );
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    setDeletingId(itemId);
+    try {
+      await menuApi.deleteMenuItem(itemId);
+      removeItem(itemId);
+    } catch (err: any) {
+      Alert.alert('Delete Failed', err.message || 'Unable to delete item. Please try again.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -53,6 +76,8 @@ export default function ManageMenuScreen() {
 
   const renderItem = ({ item }: { item: MenuItem }) => {
     const itemId = item.id || item._id || '';
+    const isDeleting = deletingId === itemId;
+
     return (
       <View style={styles.card}>
         <View style={styles.cardContent}>
@@ -72,6 +97,17 @@ export default function ManageMenuScreen() {
             onPress={() => router.push({ pathname: '/admin/item', params: { id: itemId } })}
           >
             <MaterialIcons name="edit" size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.deleteButton}
+            onPress={() => confirmDeleteItem(item)}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -95,14 +131,14 @@ export default function ManageMenuScreen() {
 
       <SearchBar searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
 
-      {isLoading ? (
+      {isLoading && items.length === 0 ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : error ? (
+      ) : error && items.length === 0 ? (
         <View style={styles.centerContainer}>
           <EmptyState icon="error-outline" title="Error" subtitle={error} />
-          <TouchableOpacity style={styles.retryButton} onPress={loadMenu}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchMenu(true)}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -113,6 +149,8 @@ export default function ManageMenuScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshing={isRefreshing}
+          onRefresh={refreshMenu}
         />
       )}
     </SafeAreaView>
@@ -196,11 +234,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switch: {
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
   editButton: {
     padding: spacing.xs,
     backgroundColor: colors.primary + '1A',
+    borderRadius: radius.sm,
+    marginRight: spacing.xs,
+  },
+  deleteButton: {
+    padding: spacing.xs,
+    backgroundColor: colors.error + '1A',
     borderRadius: radius.sm,
   },
 });

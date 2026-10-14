@@ -71,7 +71,7 @@ export default function MoreScreen() {
           <SettingsRow 
             icon="settings" 
             title="App Settings" 
-            subtitle="Manage demo data and preferences"
+            subtitle="Order defaults and printing preferences"
             onPress={() => router.push('/settings/app')}
           />
           <SettingsRow 

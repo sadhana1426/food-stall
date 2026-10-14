@@ -23,6 +23,11 @@ export default function BillDetailsScreen() {
   const [isPrinting, setIsPrinting] = useState(false);
 
   const loadOrder = useCallback(async () => {
+    if (!id) {
+      setError('No bill ID provided.');
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -50,8 +55,8 @@ export default function BillDetailsScreen() {
   const handleDownload = async () => {
     if (!order) return;
     try {
-      // Create an alert or status update if you have a loading state for download
-      const uri = await reportsApi.downloadOrderPdf(order._id);
+      const orderDbId = order._id || order.id;
+      const uri = await reportsApi.downloadOrderPdf(orderDbId);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri);
       } else {
@@ -63,20 +68,21 @@ export default function BillDetailsScreen() {
   };
 
   const handleReprint = async () => {
-    if (!order) return;
+    if (!order || isPrinting) return;
     setIsPrinting(true);
     const success = await printOrder(order);
     setIsPrinting(false);
     if (success) {
       try {
-        await ordersApi.reprintOrder(order._id);
+        const orderDbId = order._id || order.id;
+        await ordersApi.reprintOrder(orderDbId);
         loadOrder(); // Refresh to get updated printCount
         alert('Bill reprinted successfully.');
       } catch (err) {
         alert('Reprint recorded locally, but failed to sync to server.');
       }
     } else {
-      alert('Printer unavailable or error occurred.');
+      alert('Printer unavailable or connection lost.');
     }
   };
 
@@ -108,10 +114,18 @@ export default function BillDetailsScreen() {
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.centerContainer}>
-          <EmptyState icon="error-outline" title="Bill Not Found" subtitle={error} />
-          <TouchableOpacity style={styles.retryButton} onPress={loadOrder}>
-             <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
+          <EmptyState icon="error-outline" title="Unable to load bill" subtitle={error} />
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+            <TouchableOpacity style={styles.retryButton} onPress={loadOrder}>
+               <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.retryButton, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]} 
+              onPress={() => router.replace('/(tabs)/history')}
+            >
+               <Text style={[styles.retryText, { color: colors.text.primary }]}>Back to History</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );

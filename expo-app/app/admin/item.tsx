@@ -11,6 +11,7 @@ import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { ToggleRow } from '../../src/components/common/ToggleRow';
 import { parseMoney, formatMoney } from '../../src/utils/money';
 import { menuApi } from '../../src/api/menuApi';
+import { useMenuStore } from '../../src/store/useMenuStore';
 
 export default function ItemFormScreen() {
   const router = useRouter();
@@ -58,6 +59,35 @@ export default function ItemFormScreen() {
       router.back();
     } else {
       router.replace('/admin/menu');
+    }
+  };
+
+  const confirmDelete = () => {
+    if (!id) return;
+    Alert.alert(
+      `Delete "${name}"?`,
+      'This will remove the item from your active menu. Past bills will remain unchanged.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete Item', 
+          style: 'destructive', 
+          onPress: handleDelete 
+        }
+      ]
+    );
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    setIsSaving(true);
+    try {
+      await menuApi.deleteMenuItem(id);
+      useMenuStore.getState().removeItem(id);
+      handleBack();
+    } catch (err: any) {
+      Alert.alert('Delete Failed', err.message || 'Unable to delete item. Please try again.');
+      setIsSaving(false);
     }
   };
 
@@ -140,9 +170,19 @@ export default function ItemFormScreen() {
       const payload = { name, pricePaise, category, isAvailable };
       
       if (isEditing && id) {
-        await menuApi.updateMenuItem(id, payload, imageUri, isImageRemoved);
+        const updated = await menuApi.updateMenuItem(id, payload, imageUri, isImageRemoved);
+        if (updated) {
+          useMenuStore.getState().upsertItem(updated);
+        } else {
+          useMenuStore.getState().refreshMenu();
+        }
       } else {
-        await menuApi.createMenuItem(payload, imageUri);
+        const created = await menuApi.createMenuItem(payload, imageUri);
+        if (created) {
+          useMenuStore.getState().upsertItem(created);
+        } else {
+          useMenuStore.getState().refreshMenu();
+        }
       }
       handleBack();
     } catch (err: any) {
@@ -156,6 +196,7 @@ export default function ItemFormScreen() {
       setIsSaving(false);
     }
   };
+
 
   const categoryOptions = [
     { label: 'Snacks', value: 'Snacks' },
@@ -251,6 +292,16 @@ export default function ItemFormScreen() {
             onPress={handleSave}
             disabled={isSaving}
           />
+          {isEditing && (
+            <TouchableOpacity 
+              style={styles.deleteItemBtn} 
+              onPress={confirmDelete}
+              disabled={isSaving}
+            >
+              <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+              <Text style={styles.deleteItemBtnText}>Delete Item</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -326,5 +377,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  deleteItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  deleteItemBtnText: {
+    color: colors.error,
+    fontWeight: typography.weight.bold,
+    marginLeft: spacing.xs,
+    fontSize: typography.size.md,
   },
 });

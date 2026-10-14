@@ -11,4 +11,10 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
-# Add any project specific keep options here:
+# react-native-bluetooth-classic
+-keep class com.kenjdavidson.rfbridge.** { *; }
+-dontwarn com.kenjdavidson.rfbridge.**
+
+# expo modules
+-keep class expo.modules.** { *; }
+-dontwarn expo.modules.**
