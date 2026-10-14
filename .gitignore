@@ -25,6 +25,10 @@ build/
 # Android
 local.properties
 */local.properties
+keystore.properties
+*/keystore.properties
+signing.properties
+*/signing.properties
 .cxx/
 */.cxx/
 android/app/build/

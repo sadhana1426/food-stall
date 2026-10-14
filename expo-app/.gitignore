@@ -12,6 +12,8 @@ dist/
 *.pem
 *.key
 local.properties
+keystore.properties
+signing.properties
 .cxx/
 android/app/build/
 *.log
