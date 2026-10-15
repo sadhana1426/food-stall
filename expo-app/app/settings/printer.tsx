@@ -410,8 +410,8 @@ export default function PrinterSetupScreen() {
               <View style={styles.configItem}>
                 <Text style={styles.configLabel}>Paper Width</Text>
                 <SegmentedControl 
-                  options={[{ label: '58mm (Standard)', value: '58mm' }, { label: '80mm (Wide)', value: '80mm' }]} 
-                  selectedValue={paperWidth} 
+                  options={[{ label: '50mm / 58mm (32 col)', value: '58mm' }, { label: '80mm (48 col)', value: '80mm' }]} 
+                  selectedValue={paperWidth === '50mm' ? '58mm' : paperWidth} 
                   onSelect={(val: any) => updateConfig({ paperWidth: val })} 
                 />
               </View>

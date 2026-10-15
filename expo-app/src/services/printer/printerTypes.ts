@@ -42,7 +42,7 @@ export function getPrinterKey(device: PrinterDevice | null | undefined): string 
   return (device.address || device.id || '').toUpperCase().trim();
 }
 
-export type PaperWidth = '58mm' | '80mm';
+export type PaperWidth = '50mm' | '58mm' | '80mm';
 
 export interface PrinterCapabilities {
   paperWidth: PaperWidth;

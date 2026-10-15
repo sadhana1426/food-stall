@@ -23,9 +23,7 @@ export default function TabsLayout() {
         isEnabled: data.taxEnabled,
         rate: data.taxRate,
       });
-      if (data.defaultDiscount) {
-        useSettingsStore.getState().setDefaultDiscountPercent(data.defaultDiscount.value || 0);
-      }
+      useSettingsStore.getState().setDefaultDiscountPercent(0);
       if (data.defaultOrderType) {
         useSettingsStore.getState().setDefaultOrderType(data.defaultOrderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In');
       }

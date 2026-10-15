@@ -154,7 +154,7 @@ export default function AppSettingsScreen() {
               />
               <View style={styles.infoTextContainer}>
                 <Text style={styles.appName}>Tasty Bites POS</Text>
-                <Text style={styles.appVersion}>Version 1.0.0 (Production)</Text>
+                <Text style={styles.appVersion}>Version 1.0.1 (Production)</Text>
               </View>
             </View>
 

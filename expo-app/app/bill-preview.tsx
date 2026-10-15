@@ -8,6 +8,7 @@ import { useCurrentOrderStore } from '../src/store/useCurrentOrderStore';
 import { usePrinterStore } from '../src/store/usePrinterStore';
 import { PrimaryButton } from '../src/components/common/PrimaryButton';
 import { formatMoney } from '../src/utils/money';
+import { formatDateTimeAscii } from '../src/services/printer/ReceiptFormatter';
 import { ordersApi } from '../src/api/ordersApi';
 
 export default function BillPreviewScreen() {
@@ -77,11 +78,10 @@ export default function BillPreviewScreen() {
             
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>{order.billNumber}</Text>
-              <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              <Text style={styles.metaText}>{order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}</Text>
             </View>
             <View style={styles.metaRow}>
-              <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()}</Text>
-              <Text style={styles.metaText}>{order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}</Text>
+              <Text style={styles.metaText}>Date: {formatDateTimeAscii(order.createdAt)}</Text>
             </View>
           </View>
 
@@ -113,19 +113,10 @@ export default function BillPreviewScreen() {
             <Text style={styles.summaryValue}>{formatMoney(order.subtotalPaise)}</Text>
           </View>
 
-          {order.discountAmountPaise > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>
-                Discount {order.discount && order.discount.type !== 'NONE' ? `(${order.discount.type === 'PERCENTAGE' ? `${order.discount.value}%` : 'Flat'})` : ''}
-              </Text>
-              <Text style={styles.summaryValue}>-{formatMoney(order.discountAmountPaise)}</Text>
-            </View>
-          )}
-
           {order.taxAmountPaise > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax ({order.taxRate}%)</Text>
-              <Text style={styles.summaryValue}>+{formatMoney(order.taxAmountPaise)}</Text>
+              <Text style={styles.summaryLabel}>GST ({order.taxRate}%)</Text>
+              <Text style={styles.summaryValue}>{formatMoney(order.taxAmountPaise)}</Text>
             </View>
           )}
 
@@ -139,7 +130,7 @@ export default function BillPreviewScreen() {
           <View style={styles.dividerDashed} />
           
           <View style={styles.receiptFooter}>
-            <Text style={styles.footerText}>{order.businessSnapshot.receiptFooter || 'Thank You'}</Text>
+            <Text style={styles.footerText}>Thank You! Visit Again.</Text>
           </View>
         </View>
       </ScrollView>
@@ -153,7 +144,7 @@ export default function BillPreviewScreen() {
           <PrimaryButton 
             label={isPrinting ? "PRINTING..." : "PRINT BILL"} 
             onPress={handlePrint}
-            disabled={isPrinting || !isPrinterConnected}
+            disabled={isPrinting}
           />
         </View>
       </View>

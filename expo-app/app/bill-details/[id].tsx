@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, radius, shadows } from '../../src/theme';
 import { usePrinterStore } from '../../src/store/usePrinterStore';
 import { PrimaryButton } from '../../src/components/common/PrimaryButton';
 import { EmptyState } from '../../src/components/common/EmptyState';
 import { formatMoney } from '../../src/utils/money';
+import { formatDateTimeAscii } from '../../src/services/printer/ReceiptFormatter';
 import { ordersApi } from '../../src/api/ordersApi';
 import { reportsApi } from '../../src/api/reportsApi';
 import * as Sharing from 'expo-sharing';
@@ -15,7 +16,7 @@ import * as Sharing from 'expo-sharing';
 export default function BillDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { printOrder, connectionState } = usePrinterStore();
+  const { reprintOrder } = usePrinterStore();
   
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,29 +61,51 @@ export default function BillDetailsScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri);
       } else {
-        alert(`Report downloaded to ${uri}`);
+        Alert.alert('Report Downloaded', `Report saved to ${uri}`);
       }
     } catch (err: any) {
-      alert(err.message || 'Unable to download report.');
+      Alert.alert('Download Error', err.message || 'Unable to download report.');
     }
   };
 
   const handleReprint = async () => {
     if (!order || isPrinting) return;
     setIsPrinting(true);
-    const success = await printOrder(order);
+    const result = await reprintOrder(order);
     setIsPrinting(false);
-    if (success) {
-      try {
-        const orderDbId = order._id || order.id;
-        await ordersApi.reprintOrder(orderDbId);
-        loadOrder(); // Refresh to get updated printCount
-        alert('Bill reprinted successfully.');
-      } catch (err) {
-        alert('Reprint recorded locally, but failed to sync to server.');
+
+    if (result.success) {
+      if (result.updatedOrder) {
+        setOrder(result.updatedOrder);
       }
+      Alert.alert('Reprint Successful', 'Bill reprinted successfully.');
+    } else if (result.status === 'NO_PRINTER') {
+      Alert.alert(
+        'No printer selected',
+        'Please select and pair a thermal printer before reprinting.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Printer Setup', onPress: () => router.push('/settings/printer') },
+        ]
+      );
+    } else if (result.status === 'DISCONNECTED') {
+      Alert.alert(
+        'Printer not connected',
+        'Printer is disconnected. Would you like to connect and reprint?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Connect & Reprint', onPress: () => handleReprint() },
+        ]
+      );
     } else {
-      alert('Printer unavailable or connection lost.');
+      Alert.alert(
+        'Receipt could not be sent to printer.',
+        'Please check that printer is turned on and in range, then retry.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry Reprint', onPress: () => handleReprint() },
+        ]
+      );
     }
   };
 
@@ -155,11 +178,10 @@ export default function BillDetailsScreen() {
             
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>{order.billNumber}</Text>
-              <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              <Text style={styles.metaText}>{order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}</Text>
             </View>
             <View style={styles.metaRow}>
-              <Text style={styles.metaText}>{new Date(order.createdAt).toLocaleDateString()}</Text>
-              <Text style={styles.metaText}>{order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}</Text>
+              <Text style={styles.metaText}>Date: {formatDateTimeAscii(order.createdAt)}</Text>
             </View>
           </View>
 
@@ -191,19 +213,10 @@ export default function BillDetailsScreen() {
             <Text style={styles.summaryValue}>{formatMoney(order.subtotalPaise)}</Text>
           </View>
 
-          {order.discountAmountPaise > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>
-                Discount {order.discount && order.discount.type !== 'NONE' ? `(${order.discount.type === 'PERCENTAGE' ? `${order.discount.value}%` : 'Flat'})` : ''}
-              </Text>
-              <Text style={styles.summaryValue}>-{formatMoney(order.discountAmountPaise)}</Text>
-            </View>
-          )}
-
           {order.taxAmountPaise > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax ({order.taxRate}%)</Text>
-              <Text style={styles.summaryValue}>+{formatMoney(order.taxAmountPaise)}</Text>
+              <Text style={styles.summaryLabel}>GST ({order.taxRate}%)</Text>
+              <Text style={styles.summaryValue}>{formatMoney(order.taxAmountPaise)}</Text>
             </View>
           )}
 
@@ -217,12 +230,12 @@ export default function BillDetailsScreen() {
           <View style={styles.dividerDashed} />
           
           <View style={styles.receiptFooter}>
-            <Text style={styles.footerText}>{order.businessSnapshot.receiptFooter || 'Thank You'}</Text>
+            <Text style={styles.footerText}>Thank You! Visit Again.</Text>
           </View>
         </View>
         
         <Text style={styles.printCountText}>
-          Printed {order.printCount} {order.printCount === 1 ? 'time' : 'times'}
+          Printed {order.printCount || 0} {(order.printCount || 0) === 1 ? 'time' : 'times'}
         </Text>
       </ScrollView>
 
@@ -234,7 +247,7 @@ export default function BillDetailsScreen() {
         <PrimaryButton 
           label={isPrinting ? "PRINTING..." : "REPRINT BILL"} 
           onPress={handleReprint}
-          disabled={isPrinting || (connectionState !== 'CONNECTED' && connectionState !== 'CONNECTING')}
+          disabled={isPrinting}
         />
       </View>
     </SafeAreaView>

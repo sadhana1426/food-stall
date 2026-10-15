@@ -9,6 +9,7 @@ import {
   getPrinterKey
 } from './printerTypes';
 import { PrinterError } from './printerErrors';
+import { buildReceiptBytes, buildTestPrintBytes } from './ReceiptFormatter';
 import { EscPosEncoder, formatTwoColumns, formatThreeColumns } from './EscPosEncoder';
 import { formatMoney } from '../../utils/money';
 
@@ -462,30 +463,7 @@ export class BluetoothPrinterService implements PrinterService {
       throw new PrinterError('CONNECTION_LOST', 'Printer is not connected.');
     }
 
-    const encoder = new EscPosEncoder();
-    encoder
-      .initialize()
-      .alignCenter()
-      .size(2, 2).bold(true).line('TASTY BITES').size(1, 1).bold(false)
-      .newline()
-      .line('Printer Connected Successfully')
-      .newline()
-      .alignLeft()
-      .line(`Printer: ${businessName}`)
-      .line(`Paper: ${capabilities.paperWidth}`)
-      .line(`Date: ${new Date().toLocaleString()}`)
-      .newline()
-      .separator(capabilities.paperWidth)
-      .alignCenter()
-      .line('Test Print Successful')
-      .separator(capabilities.paperWidth)
-      .paperFeed(3);
-
-    if (capabilities.supportsCutter) {
-      encoder.cut();
-    }
-
-    const data = encoder.build();
+    const data = buildTestPrintBytes(businessName, capabilities.paperWidth, Boolean(capabilities.supportsCutter));
     return this.write(this.connectedDeviceAddress, data);
   }
 
@@ -494,65 +472,7 @@ export class BluetoothPrinterService implements PrinterService {
       throw new PrinterError('CONNECTION_LOST', 'Printer is not connected.');
     }
 
-    const encoder = new EscPosEncoder();
-    encoder.initialize().alignCenter();
-
-    // Header
-    encoder.size(2, 2).bold(true).line(order.businessSnapshot?.name || 'Tasty Bites').size(1, 1).bold(false);
-    if (order.businessSnapshot?.address) encoder.line(order.businessSnapshot.address);
-    if (order.businessSnapshot?.phone) encoder.line(`Ph: ${order.businessSnapshot.phone}`);
-    encoder.separator(capabilities.paperWidth);
-
-    // Meta
-    encoder.alignLeft();
-    encoder.line(`Bill No: ${order.billNumber}`);
-    encoder.line(`Date: ${new Date(order.createdAt).toLocaleString()}`);
-    encoder.line(`Type: ${order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}`);
-    encoder.separator(capabilities.paperWidth);
-
-    // Items Header
-    encoder.line(formatThreeColumns('Item', 'Qty', 'Amount', capabilities.paperWidth));
-    encoder.separator(capabilities.paperWidth);
-
-    // Items
-    (order.items || []).forEach((item: any) => {
-      const name = item.itemName || item.name;
-      const qty = item.quantity.toString();
-      const amt = formatMoney(item.lineTotalPaise);
-      encoder.line(formatThreeColumns(name, qty, amt, capabilities.paperWidth));
-    });
-    encoder.separator(capabilities.paperWidth);
-
-    // Totals
-    encoder.line(formatTwoColumns('Subtotal', formatMoney(order.subtotalPaise), capabilities.paperWidth));
-    if (order.discountAmountPaise > 0) {
-      encoder.line(formatTwoColumns('Discount', `-${formatMoney(order.discountAmountPaise)}`, capabilities.paperWidth));
-    }
-    if (order.taxAmountPaise > 0) {
-      encoder.line(formatTwoColumns(`Tax (${order.taxRate}%)`, `+${formatMoney(order.taxAmountPaise)}`, capabilities.paperWidth));
-    }
-    encoder.separator(capabilities.paperWidth);
-    
-    encoder.size(1, 2).bold(true);
-    encoder.line(formatTwoColumns('TOTAL', `Rs ${formatMoney(order.grandTotalPaise)}`, capabilities.paperWidth));
-    encoder.size(1, 1).bold(false);
-    encoder.separator(capabilities.paperWidth);
-
-    // Footer
-    encoder.alignCenter();
-    encoder.line(order.businessSnapshot?.receiptFooter || 'Thank You! Visit Again.');
-    
-    // Print Count
-    if (order.printCount > 0) {
-      encoder.newline().line(`(Reprint ${order.printCount})`);
-    }
-
-    encoder.paperFeed(3);
-    if (capabilities.supportsCutter) {
-      encoder.cut();
-    }
-
-    const data = encoder.build();
+    const data = buildReceiptBytes(order, capabilities.paperWidth, Boolean(capabilities.supportsCutter));
     return this.write(this.connectedDeviceAddress, data);
   }
 }

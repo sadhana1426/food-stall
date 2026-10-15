@@ -12,6 +12,7 @@ import {
   getPrinterKey,
   getUserFriendlyPrinterError
 } from '../services/printer';
+import { ordersApi } from '../api/ordersApi';
 
 const PRINTER_STORE_KEY = 'tasty_bites_printer_config';
 const LOG_TAG = '[Printer]';
@@ -63,6 +64,7 @@ export interface PrinterStoreState extends PrinterConfig {
   testPrint: (businessName?: string) => Promise<boolean>;
   ensureConnectedForPrint: () => Promise<boolean>;
   printOrder: (order: any) => Promise<boolean>;
+  reprintOrder: (order: any) => Promise<{ success: boolean; status: 'SUCCESS' | 'NO_PRINTER' | 'DISCONNECTED' | 'FAILED'; error?: string; updatedOrder?: any }>;
   handleConnectionLost: () => void;
   clearPrinterError: () => void;
 
@@ -593,6 +595,98 @@ export const usePrinterStore = create<PrinterStoreState>((set, get) => ({
 
     writeLockPromise = doOrderPrint();
     return writeLockPromise;
+  },
+
+  reprintOrder: async (order: any) => {
+    if (!order) {
+      return { success: false, status: 'FAILED' as const, error: 'No bill provided for reprint.' };
+    }
+    if (get().isPrinting) {
+      return { success: false, status: 'FAILED' as const, error: 'Printer is currently printing.' };
+    }
+    if (writeLockPromise) {
+      try { await writeLockPromise; } catch {}
+    }
+
+    const doReprint = async (): Promise<{ success: boolean; status: 'SUCCESS' | 'NO_PRINTER' | 'DISCONNECTED' | 'FAILED'; error?: string; updatedOrder?: any }> => {
+      // 1. Reconcile Bluetooth state
+      try {
+        await get().reconcileBluetoothState('reprint');
+      } catch (err) {
+        console.warn(`${LOG_TAG} reconcile error before reprint:`, err);
+      }
+
+      // 2. Ensure selected printer exists
+      const { selectedPrinter } = get();
+      if (!selectedPrinter) {
+        set({ lastError: 'No printer selected.' });
+        return { success: false, status: 'NO_PRINTER', error: 'No printer selected' };
+      }
+
+      // 3. Ensure actual Bluetooth Classic socket is connected
+      let isConn = false;
+      try {
+        isConn = await printerService.isConnected(selectedPrinter.address);
+      } catch {
+        isConn = false;
+      }
+
+      if (!isConn) {
+        console.log(`${LOG_TAG} reprint: printer disconnected, attempting reconnection...`);
+        const reconnected = await get().connectSelectedPrinter();
+        if (!reconnected) {
+          set({ lastError: 'Printer not connected.' });
+          return { success: false, status: 'DISCONNECTED', error: 'Printer not connected' };
+        }
+      }
+
+      // 4. Build receipt from SAVED immutable bill and send once
+      set({ isPrinting: true, lastError: null });
+      try {
+        const caps: PrinterCapabilities = {
+          paperWidth: get().paperWidth,
+          supportsCutter: get().supportsCutter,
+        };
+
+        console.log(`${LOG_TAG} reprint write start for bill #`, order.billNumber);
+        const result = await printerService.printReceipt(order, caps);
+        console.log(`${LOG_TAG} reprint write success:`, result);
+        set({ isPrinting: false });
+
+        if (!result) {
+          set({ lastError: 'Receipt could not be sent to printer.' });
+          return { success: false, status: 'FAILED', error: 'Receipt could not be sent to printer.' };
+        }
+
+        // 5. Only after successful send: increment reprint count
+        let updatedOrder = order;
+        const orderDbId = order._id || order.id;
+        if (orderDbId) {
+          try {
+            const resp = await ordersApi.reprintOrder(orderDbId);
+            if (resp) {
+              updatedOrder = resp;
+            }
+          } catch (syncErr: any) {
+            console.warn(`${LOG_TAG} failed to sync reprint count to backend:`, syncErr?.message);
+            updatedOrder = { ...order, printCount: (order.printCount || 0) + 1 };
+          }
+        }
+
+        return { success: true, status: 'SUCCESS', updatedOrder };
+      } catch (e: any) {
+        console.warn(`${LOG_TAG} reprint write error:`, e.message);
+        const friendly = getUserFriendlyPrinterError(e.code || 'WRITE_FAILED', e.message);
+        set({ isPrinting: false, lastError: friendly });
+        return { success: false, status: 'FAILED', error: friendly || 'Receipt could not be sent to printer.' };
+      } finally {
+        writeLockPromise = null;
+      }
+    };
+
+    const task = doReprint();
+    writeLockPromise = task.then(r => r.success);
+    return task;
   },
 
   handleConnectionLost: () => {

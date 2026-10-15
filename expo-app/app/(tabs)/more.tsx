@@ -54,8 +54,8 @@ export default function MoreScreen() {
           />
           <SettingsRow 
             icon="receipt" 
-            title="Tax & Discount" 
-            subtitle="Configure default tax and discounts"
+            title="GST Settings" 
+            subtitle="Configure GST rate and billing tax"
             onPress={() => router.push('/settings/tax-discount')}
           />
           <SettingsRow 

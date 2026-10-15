@@ -17,13 +17,10 @@ export default function BusinessSetupScreen() {
   
   const [taxEnabled, setTaxEnabled] = useState(false);
   const [taxRate, setTaxRate] = useState('0');
-  
-  const [discountType, setDiscountType] = useState('NONE');
-  const [discountValue, setDiscountValue] = useState('0');
 
   const [orderType, setOrderType] = useState('DINE_IN');
-  const [paperWidth, setPaperWidth] = useState('80mm');
-  const [receiptFooter, setReceiptFooter] = useState('Thank you! Visit again.');
+  const [paperWidth, setPaperWidth] = useState('58mm');
+  const [receiptFooter, setReceiptFooter] = useState('Thank You! Visit Again.');
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -39,8 +36,8 @@ export default function BusinessSetupScreen() {
           taxEnabled,
           taxRate: parseFloat(taxRate) || 0,
           defaultDiscount: {
-            type: discountType,
-            value: parseFloat(discountValue) || 0
+            type: 'NONE',
+            value: 0
           },
           defaultOrderType: orderType,
           paperWidth,
@@ -66,33 +63,16 @@ export default function BusinessSetupScreen() {
         <View style={styles.form}>
           <InlineError message={error} />
           
-          <Text style={styles.sectionTitle}>Tax Settings</Text>
-          <ToggleRow title="Enable Tax" subtitle="Apply tax to orders" value={taxEnabled} onValueChange={setTaxEnabled} />
+          <Text style={styles.sectionTitle}>GST Settings</Text>
+          <ToggleRow title="Enable GST" subtitle="Apply GST to orders" value={taxEnabled} onValueChange={setTaxEnabled} />
           {taxEnabled && (
-            <AppTextInput label="Tax Rate (%)" value={taxRate} onChangeText={setTaxRate} keyboardType="numeric" />
-          )}
-
-          <Text style={styles.sectionTitle}>Discount</Text>
-          <SegmentedControl 
-            options={[{label:'None', value:'NONE'}, {label:'Percent', value:'PERCENTAGE'}, {label:'Fixed', value:'FIXED'}]}
-            selectedValue={discountType}
-            onSelect={setDiscountType}
-          />
-          {discountType !== 'NONE' && (
-            <View style={{marginTop: spacing.md}}>
-              <AppTextInput 
-                label={discountType === 'PERCENTAGE' ? "Discount (%)" : "Discount Amount"} 
-                value={discountValue} 
-                onChangeText={setDiscountValue} 
-                keyboardType="numeric" 
-              />
-            </View>
+            <AppTextInput label="GST Rate (%)" value={taxRate} onChangeText={setTaxRate} keyboardType="numeric" />
           )}
 
           <View style={{marginTop: spacing.xl}}>
-            <Text style={styles.sectionTitle}>Receipt</Text>
+            <Text style={styles.sectionTitle}>Receipt Paper Width</Text>
             <SegmentedControl 
-              options={[{label:'58mm', value:'58mm'}, {label:'80mm', value:'80mm'}]}
+              options={[{label:'50mm (Standard)', value:'58mm'}, {label:'80mm (Wide)', value:'80mm'}]}
               selectedValue={paperWidth}
               onSelect={setPaperWidth}
             />

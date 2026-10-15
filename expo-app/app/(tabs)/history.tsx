@@ -1,19 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, radius, shadows } from '../../src/theme';
 import { EmptyState } from '../../src/components/common/EmptyState';
 import { formatMoney } from '../../src/utils/money';
+import { formatDateTimeAscii } from '../../src/services/printer/ReceiptFormatter';
 import { ordersApi } from '../../src/api/ordersApi';
+import { usePrinterStore } from '../../src/store/usePrinterStore';
 import { useFocusEffect } from 'expo-router';
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const { reprintOrder, isPrinting } = usePrinterStore();
   
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reprintingId, setReprintingId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -34,21 +39,92 @@ export default function HistoryScreen() {
     }, [loadOrders])
   );
 
+  const handleQuickReprint = async (item: any) => {
+    const itemId = item._id || item.id;
+    if (reprintingId || isPrinting) return;
+    setReprintingId(itemId);
+
+    const result = await reprintOrder(item);
+    setReprintingId(null);
+
+    if (result.success) {
+      if (result.updatedOrder) {
+        setOrders(prev => prev.map(o => (o._id || o.id) === itemId ? result.updatedOrder : o));
+      }
+      Alert.alert('Reprint Successful', `Bill #${item.billNumber} reprinted successfully.`);
+    } else if (result.status === 'NO_PRINTER') {
+      Alert.alert(
+        'No printer selected',
+        'Please select and pair a thermal printer before reprinting.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Printer Setup', onPress: () => router.push('/settings/printer') },
+        ]
+      );
+    } else if (result.status === 'DISCONNECTED') {
+      Alert.alert(
+        'Printer not connected',
+        'Printer is disconnected. Would you like to connect and reprint?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Connect & Reprint', onPress: () => handleQuickReprint(item) },
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Receipt could not be sent to printer.',
+        'Please check that printer is turned on and in range, then retry.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry Reprint', onPress: () => handleQuickReprint(item) },
+        ]
+      );
+    }
+  };
+
   const renderOrder = ({ item }: { item: any }) => {
+    const itemId = item._id || item.id;
+    const isThisReprinting = reprintingId === itemId;
+
     return (
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => router.push({ pathname: '/bill-details/[id]', params: { id: item._id || item.id } })}
+        onPress={() => router.push({ pathname: '/bill-details/[id]', params: { id: itemId } })}
+        activeOpacity={0.8}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.billNumber}>{item.billNumber}</Text>
+          <View style={styles.billTitleRow}>
+            <Text style={styles.billNumber}>{item.billNumber}</Text>
+            {item.printCount > 0 && (
+              <View style={styles.reprintBadge}>
+                <Text style={styles.reprintBadgeText}>Printed {item.printCount}x</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.orderType}>{item.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}</Text>
         </View>
+
         <View style={styles.cardFooter}>
           <Text style={styles.dateText}>
-            {new Date(item.createdAt).toLocaleDateString()} • {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {formatDateTimeAscii(item.createdAt)}
           </Text>
-          <Text style={styles.amountText}>₹{formatMoney(item.grandTotalPaise)}</Text>
+          <View style={styles.rightActionRow}>
+            <Text style={styles.amountText}>₹{formatMoney(item.grandTotalPaise)}</Text>
+            <TouchableOpacity 
+              style={styles.quickReprintBtn}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleQuickReprint(item);
+              }}
+              disabled={isThisReprinting || isPrinting}
+            >
+              {isThisReprinting ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <MaterialIcons name="print" size={20} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -175,5 +251,31 @@ const styles = StyleSheet.create({
     fontSize: typography.size.lg,
     fontWeight: typography.weight.bold,
     color: colors.text.primary,
+  },
+  billTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  reprintBadge: {
+    backgroundColor: colors.accent + '20',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  reprintBadgeText: {
+    fontSize: typography.size.xs - 2,
+    color: colors.accent,
+    fontWeight: typography.weight.bold,
+  },
+  rightActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  quickReprintBtn: {
+    padding: spacing.xs,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary + '15',
   },
 });

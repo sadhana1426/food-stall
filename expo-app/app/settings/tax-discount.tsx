@@ -8,16 +8,14 @@ import { useSettingsStore } from '../../src/store/useSettingsStore';
 import { AppTextInput } from '../../src/components/common/AppTextInput';
 import { PrimaryButton } from '../../src/components/common/PrimaryButton';
 import { ToggleRow } from '../../src/components/common/ToggleRow';
-import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { settingsApi } from '../../src/api/settingsApi';
 
 export default function TaxDiscountSettingsScreen() {
   const router = useRouter();
-  const { setDefaultDiscountPercent } = useSettingsStore(); // Still use for local cart UX preview
+  const { setDefaultDiscountPercent } = useSettingsStore();
   
   const [taxEnabled, setTaxEnabled] = useState(false);
   const [taxRate, setTaxRate] = useState('0');
-  const [discountPercent, setDiscountPercent] = useState('0');
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -28,10 +26,7 @@ export default function TaxDiscountSettingsScreen() {
       .then(data => {
         setTaxEnabled(data.taxEnabled);
         setTaxRate(data.taxRate.toString());
-        const pct = data.defaultDiscount?.value || 0;
-        setDiscountPercent(pct.toString());
-        // Synchronize local preview store
-        setDefaultDiscountPercent(pct);
+        setDefaultDiscountPercent(0);
         setIsLoading(false);
       })
       .catch(err => {
@@ -43,18 +38,17 @@ export default function TaxDiscountSettingsScreen() {
   const handleSave = async () => {
     setIsSaving(true);
     setError('');
-    const pct = parseInt(discountPercent) || 0;
     const rate = parseFloat(taxRate) || 0;
     try {
       await settingsApi.updateBillingSettings({
         taxEnabled,
         taxRate: rate,
         defaultDiscount: {
-          type: pct > 0 ? 'PERCENTAGE' : 'NONE',
-          value: pct
+          type: 'NONE',
+          value: 0
         }
       });
-      setDefaultDiscountPercent(pct); // Sync local preview
+      setDefaultDiscountPercent(0);
       useSettingsStore.getState().updateTax({ isEnabled: taxEnabled, rate });
       handleBack();
     } catch (err: any) {
@@ -71,13 +65,6 @@ export default function TaxDiscountSettingsScreen() {
     }
   };
 
-  const discountOptions = [
-    { label: 'None', value: '0' },
-    { label: '5%', value: '5' },
-    { label: '10%', value: '10' },
-    { label: '15%', value: '15' },
-  ];
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -85,7 +72,7 @@ export default function TaxDiscountSettingsScreen() {
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Tax & Discount</Text>
+          <Text style={styles.headerTitle}>GST Settings</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -105,48 +92,29 @@ export default function TaxDiscountSettingsScreen() {
           <TouchableOpacity onPress={handleBack} style={styles.backButton} disabled={isSaving}>
             <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Tax & Discount</Text>
+          <Text style={styles.headerTitle}>GST Settings</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.content}>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tax Settings</Text>
+            <Text style={styles.sectionTitle}>GST Settings</Text>
             <ToggleRow
-              title="Enable Tax"
-              subtitle="Automatically apply tax to orders"
+              title="Enable GST"
+              subtitle="Automatically apply GST to orders"
               value={taxEnabled}
               onValueChange={(val) => !isSaving && setTaxEnabled(val)}
             />
             {taxEnabled && (
               <AppTextInput
-                label="Default Tax Rate (%)"
+                label="Default GST Rate (%)"
                 value={taxRate}
                 onChangeText={setTaxRate}
                 keyboardType="numeric"
                 editable={!isSaving}
               />
             )}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Discount Settings</Text>
-            <Text style={styles.label}>Default Discount (%)</Text>
-            <SegmentedControl 
-              options={discountOptions} 
-              selectedValue={discountPercent} 
-              onSelect={(val) => !isSaving && setDiscountPercent(val)} 
-            />
-            
-            <View style={{ height: spacing.sm }} />
-            <AppTextInput
-              label="Custom Default Discount (%)"
-              value={discountPercent}
-              onChangeText={setDiscountPercent}
-              keyboardType="numeric"
-              editable={!isSaving}
-            />
           </View>
         </ScrollView>
         

@@ -33,18 +33,32 @@ export class EscPosEncoder {
     return this;
   }
 
+  public resetStyle(): this {
+    this.bold(false);
+    this.size(1, 1);
+    this.alignLeft();
+    return this;
+  }
+
   public text(str: string): this {
-    for (let i = 0; i < str.length; i++) {
-      let code = str.charCodeAt(i);
-      // Basic substitution for common unsupported characters (like ₹)
-      if (code === 0x20B9) {
-        // Fallback for Rupee symbol: Rs
-        this.buffer.push(0x52, 0x73, 0x20);
+    if (!str) return this;
+    // Replace non-ASCII and special characters with pure ASCII equivalents
+    const sanitized = str
+      .replace(/[\u202F\u00A0\u2000-\u200B]/g, ' ') // Narrow non-breaking space, non-breaking space, zero-width space
+      .replace(/\u20B9/g, 'Rs ') // Rupee symbol
+      .replace(/[\u2018\u2019]/g, "'") // Single quotes
+      .replace(/[\u201C\u201D]/g, '"') // Double quotes
+      .replace(/[\u2013\u2014]/g, '-'); // Dashes
+
+    for (let i = 0; i < sanitized.length; i++) {
+      let code = sanitized.charCodeAt(i);
+      if (code === 10 || (code >= 32 && code <= 126)) {
+        this.buffer.push(code);
       } else if (code < 256) {
         this.buffer.push(code);
       } else {
-        // Replace with ?
-        this.buffer.push(0x3f);
+        // Fallback to space instead of '?' to prevent ugly question marks
+        this.buffer.push(0x20);
       }
     }
     return this;

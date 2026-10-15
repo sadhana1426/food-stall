@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,17 +9,16 @@ import { useSettingsStore } from '../src/store/useSettingsStore';
 import { useCurrentOrderStore } from '../src/store/useCurrentOrderStore';
 import { PrimaryButton } from '../src/components/common/PrimaryButton';
 import { SecondaryButton } from '../src/components/common/SecondaryButton';
-import { formatMoney, calculateDiscount, calculateTax, DiscountType } from '../src/utils/money';
+import { formatMoney, calculateTax } from '../src/utils/money';
 import { ordersApi } from '../src/api/ordersApi';
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const { items, getSubtotalPaise } = useCartStore();
-  const { defaultOrderType, tax: taxSettings, defaultDiscountPercent, setDefaultDiscountPercent } = useSettingsStore();
+  const { defaultOrderType, tax: taxSettings } = useSettingsStore();
   const { setCurrentOrder } = useCurrentOrderStore();
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Idempotency key per checkout attempt
@@ -40,14 +39,8 @@ export default function CheckoutScreen() {
   };
 
   const subtotalPaise = getSubtotalPaise();
-  
-  // Frontend preview calculations
-  const discountType: DiscountType = defaultDiscountPercent > 0 ? 'PERCENTAGE' : 'NONE';
-  const discountValue = defaultDiscountPercent;
-  const discountAmountPaise = calculateDiscount(subtotalPaise, discountType, discountValue);
-  const taxableAmountPaise = subtotalPaise - discountAmountPaise;
-  const taxAmountPaise = calculateTax(taxableAmountPaise, taxSettings.rate, taxSettings.isEnabled);
-  const grandTotalPaise = taxableAmountPaise + taxAmountPaise;
+  const taxAmountPaise = calculateTax(subtotalPaise, taxSettings.rate, taxSettings.isEnabled);
+  const grandTotalPaise = subtotalPaise + taxAmountPaise;
 
   const handleGenerateBill = async () => {
     if (items.length === 0 || isGenerating) return;
@@ -65,8 +58,8 @@ export default function CheckoutScreen() {
         orderType: defaultOrderType === 'Takeaway' ? 'TAKEAWAY' : 'DINE_IN',
         items: orderItems,
         discount: {
-          type: discountType,
-          value: discountValue
+          type: 'NONE',
+          value: 0
         }
       });
       
@@ -77,8 +70,6 @@ export default function CheckoutScreen() {
       setIsGenerating(false);
     }
   };
-
-  const discountOptions = [0, 5, 10, 15];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -101,25 +92,11 @@ export default function CheckoutScreen() {
             <Text style={styles.summaryLabel}>Subtotal</Text>
             <Text style={styles.summaryValue}>₹{formatMoney(subtotalPaise)}</Text>
           </View>
-          
-          <TouchableOpacity 
-            style={styles.summaryRowInteractive}
-            onPress={() => !isGenerating && setShowDiscountModal(true)}
-            disabled={isGenerating}
-          >
-            <Text style={styles.summaryLabelDiscount}>Discount {discountValue > 0 ? `(${discountValue}%)` : ''}</Text>
-            <View style={styles.discountRight}>
-              <Text style={styles.summaryValueDiscount}>
-                {discountAmountPaise > 0 ? `-₹${formatMoney(discountAmountPaise)}` : 'Add'}
-              </Text>
-              <MaterialIcons name="chevron-right" size={20} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
 
           {taxSettings.isEnabled && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax ({taxSettings.rate}%)</Text>
-              <Text style={styles.summaryValue}>+₹{formatMoney(taxAmountPaise)}</Text>
+              <Text style={styles.summaryLabel}>GST ({taxSettings.rate}%)</Text>
+              <Text style={styles.summaryValue}>₹{formatMoney(taxAmountPaise)}</Text>
             </View>
           )}
 
@@ -152,36 +129,6 @@ export default function CheckoutScreen() {
           disabled={items.length === 0 || isGenerating}
         />
       </View>
-
-      <Modal visible={showDiscountModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Apply Discount</Text>
-              <TouchableOpacity onPress={() => setShowDiscountModal(false)}>
-                <MaterialIcons name="close" size={24} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.discountOptions}>
-              {discountOptions.map(pct => (
-                <TouchableOpacity 
-                  key={pct}
-                  style={[styles.discountBtn, defaultDiscountPercent === pct && styles.discountBtnActive]}
-                  onPress={() => {
-                    setDefaultDiscountPercent(pct);
-                    setShowDiscountModal(false);
-                  }}
-                >
-                  <Text style={[styles.discountBtnText, defaultDiscountPercent === pct && styles.discountBtnTextActive]}>
-                    {pct === 0 ? 'None' : `${pct}%`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -240,13 +187,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  summaryRowInteractive: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingVertical: spacing.xs,
-  },
   summaryLabel: {
     fontSize: typography.size.md,
     color: colors.text.secondary,
@@ -255,21 +195,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     color: colors.text.primary,
     fontWeight: typography.weight.medium,
-  },
-  summaryLabelDiscount: {
-    fontSize: typography.size.md,
-    color: colors.primary,
-    fontWeight: typography.weight.medium,
-  },
-  discountRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  summaryValueDiscount: {
-    fontSize: typography.size.md,
-    color: colors.primary,
-    fontWeight: typography.weight.bold,
-    marginRight: 4,
   },
   divider: {
     height: 1,
@@ -304,54 +229,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalTitle: {
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-  discountOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  discountBtn: {
-    flex: 1,
-    minWidth: '45%',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  discountBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  discountBtnText: {
-    fontSize: typography.size.md,
-    fontWeight: typography.weight.semiBold,
-    color: colors.text.primary,
-  },
-  discountBtnTextActive: {
-    color: colors.white,
   },
 });
