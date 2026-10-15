@@ -106,9 +106,9 @@ export class MockPrinterService implements PrinterService {
     };
   }
 
-  async printTest(capabilities: PrinterCapabilities, businessName: string): Promise<boolean> {
+  async printTest(capabilities: PrinterCapabilities, businessName?: string, footer?: string): Promise<boolean> {
     if (!this.connectedDeviceAddress) throw new PrinterError('CONNECTION_LOST', 'Disconnected');
-    console.log(`[MOCK PRINTER] Printed test for ${businessName} at ${capabilities.paperWidth}`);
+    console.log(`[MOCK PRINTER] Printed test for ${businessName} (footer: ${footer}) at ${capabilities.paperWidth}`);
     return new Promise((resolve) => setTimeout(() => resolve(true), 500));
   }
 

@@ -8,7 +8,7 @@ import { useCurrentOrderStore } from '../src/store/useCurrentOrderStore';
 import { usePrinterStore } from '../src/store/usePrinterStore';
 import { PrimaryButton } from '../src/components/common/PrimaryButton';
 import { formatMoney } from '../src/utils/money';
-import { formatDateTimeAscii } from '../src/services/printer/ReceiptFormatter';
+import { formatDateTimeAscii, resolveReceiptFooter } from '../src/services/printer/ReceiptFormatter';
 import { ordersApi } from '../src/api/ordersApi';
 
 export default function BillPreviewScreen() {
@@ -130,7 +130,7 @@ export default function BillPreviewScreen() {
           <View style={styles.dividerDashed} />
           
           <View style={styles.receiptFooter}>
-            <Text style={styles.footerText}>Thank You! Visit Again.</Text>
+            <Text style={styles.footerText}>{resolveReceiptFooter(order)}</Text>
           </View>
         </View>
       </ScrollView>

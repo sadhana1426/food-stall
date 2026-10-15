@@ -1,5 +1,35 @@
 import { EscPosEncoder } from './EscPosEncoder';
 import { PaperWidth } from './printerTypes';
+import { useSettingsStore } from '../../store/useSettingsStore';
+
+export const DEFAULT_RECEIPT_FOOTER = 'Thank You! Visit Again.';
+
+/**
+ * Resolve receipt footer with priority:
+ * 1. Saved historical footer snapshot (either explicit receiptFooterSnapshot or businessSnapshot.receiptFooter)
+ * 2. Current saved business receipt footer from settings store (for new bills or legacy bills without snapshot)
+ * 3. Default fallback: 'Thank You! Visit Again.'
+ */
+export function resolveReceiptFooter(order?: any): string {
+  // 1. Saved historical footer snapshot
+  const snapshotFooter = order?.receiptFooterSnapshot || order?.businessSnapshot?.receiptFooter;
+  if (snapshotFooter && typeof snapshotFooter === 'string' && snapshotFooter.trim().length > 0) {
+    return snapshotFooter.trim();
+  }
+
+  // 2. Current saved business receipt footer
+  try {
+    const currentBusinessFooter = useSettingsStore.getState().business?.receiptFooter;
+    if (currentBusinessFooter && typeof currentBusinessFooter === 'string' && currentBusinessFooter.trim().length > 0) {
+      return currentBusinessFooter.trim();
+    }
+  } catch {
+    // In environments where store is unavailable (e.g. headless unit tests)
+  }
+
+  // 3. Default fallback
+  return DEFAULT_RECEIPT_FOOTER;
+}
 
 export interface PrintProfile {
   paperWidth: PaperWidth;
@@ -191,10 +221,17 @@ export function buildReceiptText(order: any, width: PaperWidth = '58mm'): string
   const out: string[] = [];
 
   // Restaurant Header
-  const restName = (order.businessSnapshot?.name || 'The Punjab Delight Co.').trim();
-  out.push(centerLine(restName, lineWidth));
+  const restName = (
+    order?.businessSnapshot?.name ||
+    useSettingsStore.getState().business?.name ||
+    'The Punjab Delight Co.'
+  ).trim();
+  const restLines = wrapWords(restName, lineWidth);
+  for (const rl of restLines) {
+    out.push(centerLine(rl, lineWidth));
+  }
 
-  const address = order.businessSnapshot?.address;
+  const address = order?.businessSnapshot?.address || useSettingsStore.getState().business?.address;
   if (address) {
     const addrLines = wrapWords(address, lineWidth);
     for (const al of addrLines) {
@@ -202,20 +239,20 @@ export function buildReceiptText(order: any, width: PaperWidth = '58mm'): string
     }
   }
 
-  const phone = order.businessSnapshot?.phone;
+  const phone = order?.businessSnapshot?.phone || useSettingsStore.getState().business?.phone;
   if (phone) {
-    out.push(centerLine(`Ph: ${phone}`, lineWidth));
+    out.push(centerLine(`Ph: ${phone.trim()}`, lineWidth));
   }
 
   out.push(sep);
 
   // Bill Meta
-  const billNum = (order.billNumber ?? '').toString().startsWith('#')
-    ? (order.billNumber ?? '').toString()
-    : `#${order.billNumber ?? ''}`;
+  const billNum = (order?.billNumber ?? '').toString().startsWith('#')
+    ? (order?.billNumber ?? '').toString()
+    : `#${order?.billNumber ?? ''}`;
   out.push(`Bill No: ${billNum}`);
-  out.push(`Date: ${formatDateTimeAscii(order.createdAt || new Date())}`);
-  out.push(`Type: ${order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}`);
+  out.push(`Date: ${formatDateTimeAscii(order?.createdAt || new Date())}`);
+  out.push(`Type: ${order?.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}`);
 
   out.push(sep);
 
@@ -228,7 +265,7 @@ export function buildReceiptText(order: any, width: PaperWidth = '58mm'): string
   out.push(sep);
 
   // Items
-  const itemLines = formatItemRows(order.items || [], profile);
+  const itemLines = formatItemRows(order?.items || [], profile);
   for (const il of itemLines) {
     out.push(il);
   }
@@ -236,23 +273,27 @@ export function buildReceiptText(order: any, width: PaperWidth = '58mm'): string
   out.push(sep);
 
   // Totals: Subtotal, GST, TOTAL (No Discount in new billing)
-  out.push(leftRight('Subtotal', formatMoney(order.subtotalPaise), lineWidth));
+  out.push(leftRight('Subtotal', formatMoney(order?.subtotalPaise), lineWidth));
 
-  const taxRate = order.taxRate ?? 5;
-  const taxAmountPaise = order.taxAmountPaise ?? Math.round((order.subtotalPaise || 0) * (taxRate / 100));
+  const taxRate = order?.taxRate ?? 5;
+  const taxAmountPaise = order?.taxAmountPaise ?? Math.round((order?.subtotalPaise || 0) * (taxRate / 100));
   out.push(leftRight(`GST (${taxRate}%)`, formatMoney(taxAmountPaise), lineWidth));
 
   out.push(sep);
 
-  const grandTotal = order.grandTotalPaise ?? ((order.subtotalPaise || 0) + taxAmountPaise);
+  const grandTotal = order?.grandTotalPaise ?? ((order?.subtotalPaise || 0) + taxAmountPaise);
   out.push(leftRight('TOTAL', `Rs ${formatMoney(grandTotal)}`, lineWidth));
 
   out.push(sep);
 
-  // Footer
-  out.push(centerLine('Thank You! Visit Again.', lineWidth));
+  // Footer: word-aware centered wrapping with dynamic footer resolution
+  const resolvedFooter = resolveReceiptFooter(order);
+  const footerLines = wrapWords(resolvedFooter, lineWidth);
+  for (const fl of footerLines) {
+    out.push(centerLine(fl, lineWidth));
+  }
 
-  if (order.printCount && order.printCount > 0) {
+  if (order?.printCount && order.printCount > 0) {
     out.push(centerLine(`(Reprint ${order.printCount})`, lineWidth));
   }
 
@@ -270,18 +311,24 @@ export function buildReceiptBytes(order: any, width: PaperWidth = '58mm', suppor
   const encoder = new EscPosEncoder();
   encoder.initialize();
 
-  // 1. Restaurant Title: centered, bold, normal width (GS ! 0x01 = double height only if 50mm, or standard)
-  encoder.alignCenter().bold(true);
-  // Double-height (height=2, width=1) only if fits within line; normal width prevents auto-wrapping
-  encoder.size(1, 1);
-  const restName = (order.businessSnapshot?.name || 'The Punjab Delight Co.').trim();
-  encoder.line(restName);
+  // 1. Restaurant Title: centered, bold, normal width, double height
+  // GS ! 0x01 = normal width (1), double height (2) -> allows full capacity (32 chars on 50mm) without accidental wrapping
+  encoder.alignCenter().bold(true).size(1, 2);
+  const restName = (
+    order?.businessSnapshot?.name ||
+    useSettingsStore.getState().business?.name ||
+    'The Punjab Delight Co.'
+  ).trim();
+  const restLines = wrapWords(restName, lineWidth);
+  for (const rl of restLines) {
+    encoder.line(rl);
+  }
 
-  // Reset style immediately to prevent leakage
+  // Reset style immediately before address: normal width, normal height, bold off
   encoder.bold(false).size(1, 1).alignCenter();
 
-  // 2. Restaurant Address: word-aware wrap, each line centered, normal font
-  const address = order.businessSnapshot?.address;
+  // 2. Restaurant Address: compact readable font, standard scale, word-aware wrap, centered
+  const address = order?.businessSnapshot?.address || useSettingsStore.getState().business?.address;
   if (address) {
     const addrLines = wrapWords(address, lineWidth);
     for (const al of addrLines) {
@@ -289,21 +336,21 @@ export function buildReceiptBytes(order: any, width: PaperWidth = '58mm', suppor
     }
   }
 
-  const phone = order.businessSnapshot?.phone;
+  const phone = order?.businessSnapshot?.phone || useSettingsStore.getState().business?.phone;
   if (phone) {
-    encoder.line(`Ph: ${phone}`);
+    encoder.line(`Ph: ${phone.trim()}`);
   }
 
-  // Divider
-  encoder.alignLeft().line(sep);
+  // Divider: left-aligned
+  encoder.resetStyle().alignLeft().line(sep);
 
   // 3. Metadata
-  const billNum = (order.billNumber ?? '').toString().startsWith('#')
-    ? (order.billNumber ?? '').toString()
-    : `#${order.billNumber ?? ''}`;
+  const billNum = (order?.billNumber ?? '').toString().startsWith('#')
+    ? (order?.billNumber ?? '').toString()
+    : `#${order?.billNumber ?? ''}`;
   encoder.line(`Bill No: ${billNum}`);
-  encoder.line(`Date: ${formatDateTimeAscii(order.createdAt || new Date())}`);
-  encoder.line(`Type: ${order.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}`);
+  encoder.line(`Date: ${formatDateTimeAscii(order?.createdAt || new Date())}`);
+  encoder.line(`Type: ${order?.orderType === 'TAKEAWAY' ? 'Takeaway' : 'Dine In'}`);
 
   // Divider
   encoder.line(sep);
@@ -316,17 +363,17 @@ export function buildReceiptBytes(order: any, width: PaperWidth = '58mm', suppor
   encoder.line(sep);
 
   // 5. Items
-  const itemLines = formatItemRows(order.items || [], profile);
+  const itemLines = formatItemRows(order?.items || [], profile);
   for (const il of itemLines) {
     encoder.line(il);
   }
   encoder.line(sep);
 
   // 6. Totals
-  encoder.line(leftRight('Subtotal', formatMoney(order.subtotalPaise), lineWidth));
+  encoder.line(leftRight('Subtotal', formatMoney(order?.subtotalPaise), lineWidth));
 
-  const taxRate = order.taxRate ?? 5;
-  const taxAmountPaise = order.taxAmountPaise ?? Math.round((order.subtotalPaise || 0) * (taxRate / 100));
+  const taxRate = order?.taxRate ?? 5;
+  const taxAmountPaise = order?.taxAmountPaise ?? Math.round((order?.subtotalPaise || 0) * (taxRate / 100));
   // GST presentation: NO '+' sign
   encoder.line(leftRight(`GST (${taxRate}%)`, formatMoney(taxAmountPaise), lineWidth));
 
@@ -334,18 +381,22 @@ export function buildReceiptBytes(order: any, width: PaperWidth = '58mm', suppor
 
   // Grand Total: emphasized size(1, 2) double height, bold
   encoder.bold(true).size(1, 2);
-  const grandTotal = order.grandTotalPaise ?? ((order.subtotalPaise || 0) + taxAmountPaise);
+  const grandTotal = order?.grandTotalPaise ?? ((order?.subtotalPaise || 0) + taxAmountPaise);
   encoder.line(leftRight('TOTAL', `Rs ${formatMoney(grandTotal)}`, lineWidth));
 
-  // Reset style
+  // Reset style immediately before footer
   encoder.bold(false).size(1, 1);
   encoder.line(sep);
 
-  // 7. Footer: centered, normal font
-  encoder.alignCenter();
-  encoder.line('Thank You! Visit Again.');
+  // 7. Footer: centered, normal font, word-aware wrapped
+  encoder.alignCenter().bold(false).size(1, 1);
+  const resolvedFooter = resolveReceiptFooter(order);
+  const footerLines = wrapWords(resolvedFooter, lineWidth);
+  for (const fl of footerLines) {
+    encoder.line(fl);
+  }
 
-  if (order.printCount && order.printCount > 0) {
+  if (order?.printCount && order.printCount > 0) {
     encoder.newline().line(`(Reprint ${order.printCount})`);
   }
 
@@ -361,7 +412,12 @@ export function buildReceiptBytes(order: any, width: PaperWidth = '58mm', suppor
 /**
  * Build ESC/POS bytes for Test Print.
  */
-export function buildTestPrintBytes(businessName: string = 'The Punjab Delight Co.', width: PaperWidth = '58mm', supportsCutter: boolean = false): Uint8Array {
+export function buildTestPrintBytes(
+  businessName?: string,
+  width: PaperWidth = '58mm',
+  supportsCutter: boolean = false,
+  footer?: string
+): Uint8Array {
   const profile = getPrintProfile(width);
   const { lineWidth } = profile;
   const sep = '-'.repeat(lineWidth);
@@ -369,9 +425,20 @@ export function buildTestPrintBytes(businessName: string = 'The Punjab Delight C
   const encoder = new EscPosEncoder();
   encoder.initialize();
 
-  encoder.alignCenter().bold(true).size(1, 1);
-  encoder.line(businessName.trim());
-  encoder.bold(false).size(1, 1);
+  // Test Print Business Name: centered, bold, normal width, double height
+  encoder.alignCenter().bold(true).size(1, 2);
+  const nameToUse = (
+    businessName ||
+    useSettingsStore.getState().business?.name ||
+    'The Punjab Delight Co.'
+  ).trim();
+  const nameLines = wrapWords(nameToUse, lineWidth);
+  for (const nl of nameLines) {
+    encoder.line(nl);
+  }
+
+  // Reset immediately before next lines
+  encoder.bold(false).size(1, 1).alignCenter();
   encoder.line('Thermal Printer Test');
   encoder.line(`Profile: ${profile.paperWidth} (${lineWidth} col)`);
   encoder.line(sep);
@@ -382,7 +449,14 @@ export function buildTestPrintBytes(businessName: string = 'The Punjab Delight C
   encoder.alignCenter();
   encoder.line('Test Print Successful');
   encoder.line(sep);
-  encoder.line('Thank You! Visit Again.');
+
+  // Dynamic Footer from parameter, or settings, or fallback
+  const resolvedFooter = (footer && footer.trim()) ? footer.trim() : resolveReceiptFooter();
+  const footerLines = wrapWords(resolvedFooter, lineWidth);
+  for (const fl of footerLines) {
+    encoder.line(fl);
+  }
+
   encoder.paperFeed(3);
   if (supportsCutter) {
     encoder.cut();

@@ -8,7 +8,7 @@ import { usePrinterStore } from '../../src/store/usePrinterStore';
 import { PrimaryButton } from '../../src/components/common/PrimaryButton';
 import { EmptyState } from '../../src/components/common/EmptyState';
 import { formatMoney } from '../../src/utils/money';
-import { formatDateTimeAscii } from '../../src/services/printer/ReceiptFormatter';
+import { formatDateTimeAscii, resolveReceiptFooter } from '../../src/services/printer/ReceiptFormatter';
 import { ordersApi } from '../../src/api/ordersApi';
 import { reportsApi } from '../../src/api/reportsApi';
 import * as Sharing from 'expo-sharing';
@@ -230,7 +230,7 @@ export default function BillDetailsScreen() {
           <View style={styles.dividerDashed} />
           
           <View style={styles.receiptFooter}>
-            <Text style={styles.footerText}>Thank You! Visit Again.</Text>
+            <Text style={styles.footerText}>{resolveReceiptFooter(order)}</Text>
           </View>
         </View>
         

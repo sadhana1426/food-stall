@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.tastybites.billing",
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#064E3B"

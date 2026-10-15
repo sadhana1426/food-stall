@@ -48,6 +48,13 @@ export interface Order {
   grandTotalPaise: number;
   createdAt: string; // ISO string
   printCount: number;
+  receiptFooterSnapshot?: string;
+  businessSnapshot?: {
+    name: string;
+    address: string;
+    phone: string;
+    receiptFooter?: string;
+  };
 }
 
 export interface SecurityQuestion {

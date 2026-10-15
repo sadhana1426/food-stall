@@ -13,6 +13,7 @@ import {
   getUserFriendlyPrinterError
 } from '../services/printer';
 import { ordersApi } from '../api/ordersApi';
+import { useSettingsStore } from './useSettingsStore';
 
 const PRINTER_STORE_KEY = 'tasty_bites_printer_config';
 const LOG_TAG = '[Printer]';
@@ -523,7 +524,7 @@ export const usePrinterStore = create<PrinterStoreState>((set, get) => ({
     return get().connectSelectedPrinter();
   },
 
-  testPrint: async (businessName = 'Tasty Bites') => {
+  testPrint: async (businessName?: string) => {
     if (get().isPrinting) return false;
     if (writeLockPromise) return writeLockPromise;
 
@@ -541,8 +542,12 @@ export const usePrinterStore = create<PrinterStoreState>((set, get) => ({
           supportsCutter: get().supportsCutter,
         };
 
+        const currentBusiness = useSettingsStore.getState().business;
+        const nameToUse = businessName || currentBusiness?.name || 'The Punjab Delight Co.';
+        const footerToUse = currentBusiness?.receiptFooter;
+
         console.log(`${LOG_TAG} test print write start`);
-        const result = await printerService.printTest(caps, businessName);
+        const result = await printerService.printTest(caps, nameToUse, footerToUse);
         console.log(`${LOG_TAG} test print write result:`, result);
         set({ isPrinting: false });
         return true;

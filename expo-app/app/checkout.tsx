@@ -63,7 +63,19 @@ export default function CheckoutScreen() {
         }
       });
       
-      setCurrentOrder(serverOrder);
+      const currentBusiness = useSettingsStore.getState().business;
+      const completeOrder = {
+        ...serverOrder,
+        receiptFooterSnapshot: serverOrder.businessSnapshot?.receiptFooter || currentBusiness?.receiptFooter || 'Thank You! Visit Again.',
+        businessSnapshot: serverOrder.businessSnapshot || {
+          name: currentBusiness?.name || 'The Punjab Delight Co.',
+          address: currentBusiness?.address || '',
+          phone: currentBusiness?.phone || '',
+          receiptFooter: currentBusiness?.receiptFooter || 'Thank You! Visit Again.',
+        }
+      };
+      
+      setCurrentOrder(completeOrder);
       router.replace({ pathname: '/bill-preview', params: { orderId: serverOrder._id, autoPrint: 'true' } });
     } catch (err: any) {
       setError(err.message || 'Unable to generate bill. Check connection and retry.');

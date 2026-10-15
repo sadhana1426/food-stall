@@ -458,12 +458,12 @@ export class BluetoothPrinterService implements PrinterService {
     };
   }
 
-  async printTest(capabilities: PrinterCapabilities, businessName: string): Promise<boolean> {
+  async printTest(capabilities: PrinterCapabilities, businessName?: string, footer?: string): Promise<boolean> {
     if (!this.connectedDeviceAddress) {
       throw new PrinterError('CONNECTION_LOST', 'Printer is not connected.');
     }
 
-    const data = buildTestPrintBytes(businessName, capabilities.paperWidth, Boolean(capabilities.supportsCutter));
+    const data = buildTestPrintBytes(businessName, capabilities.paperWidth, Boolean(capabilities.supportsCutter), footer);
     return this.write(this.connectedDeviceAddress, data);
   }
 

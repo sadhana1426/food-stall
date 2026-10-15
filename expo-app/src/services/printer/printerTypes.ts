@@ -83,7 +83,7 @@ export interface PrinterService {
   isConnected(address?: string): Promise<boolean>;
   isDeviceConnected?(address: string): Promise<boolean>;
   write(address: string, payload: Uint8Array | string): Promise<boolean>;
-  printTest(capabilities: PrinterCapabilities, businessName: string): Promise<boolean>;
+  printTest(capabilities: PrinterCapabilities, businessName?: string, footer?: string): Promise<boolean>;
   printReceipt(order: any, capabilities: PrinterCapabilities): Promise<boolean>;
   subscribeToAdapterEvents?(onEnabled: () => void, onDisabled: () => void): () => void;
   subscribeToConnectionEvents?(
